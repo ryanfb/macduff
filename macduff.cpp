@@ -8,6 +8,17 @@
 
 #define MAX_CONTOUR_APPROX  7
 
+#define MAX_RGB_DISTANCE 444
+
+double euclidean_distance(CvScalar p_1, CvScalar p_2)
+{
+    double sum = 0;
+    for(int i = 0; i < 3; i++) {
+        sum += pow(p_1.val[i]-p_2.val[i],2.);
+    }
+    return sqrt(sum);
+}
+
 CvSeq * find_quad( CvSeq * src_contour, CvMemStorage *storage, int min_size)
 {
     // stolen from icvGenerateQuads
@@ -85,38 +96,39 @@ IplImage * find_macbeth( const char *img )
     
     // BabelColor averages in sRGB:
     //   http://www.babelcolor.com/main_level/ColorChecker.htm
+    // (converted to BGR order for comparison)
     CvScalar colorchecker_srgb[MACBETH_HEIGHT][MACBETH_WIDTH] =
         {
             {
-                cvScalar(115,81,67),
-                cvScalar(196,149,129),
-                cvScalar(93,123,157),
-                cvScalar(90,108,65),
-                cvScalar(130,129,176),
-                cvScalar(99,191,171)
+                cvScalar(67,81,115),
+                cvScalar(129,149,196),
+                cvScalar(157,123,93),
+                cvScalar(65,108,90),
+                cvScalar(176,129,130),
+                cvScalar(171,191,99)
             },
             {
-                cvScalar(220,123,45),
-                cvScalar(72,92,168),
-                cvScalar(195,84,98),
-                cvScalar(91,59,105),
-                cvScalar(160,189,62),
-                cvScalar(229,161,41)
+                cvScalar(45,123,220),
+                cvScalar(168,92,72),
+                cvScalar(98,84,195),
+                cvScalar(105,59,91),
+                cvScalar(62,189,160),
+                cvScalar(41,161,229)
             },
             {
-                cvScalar(43,62,147),
-                cvScalar(71,149,72),
-                cvScalar(176,48,56),
-                cvScalar(238,200,22),
-                cvScalar(188,84,150),
-                cvScalar(0,136,166)
+                cvScalar(147,62,43),
+                cvScalar(72,149,71),
+                cvScalar(56,48,176),
+                cvScalar(22,200,238),
+                cvScalar(150,84,188),
+                cvScalar(166,136,0)
             },
             {
-                cvScalar(245,245,240),
-                cvScalar(200,201,201),
-                cvScalar(160,161,161),
-                cvScalar(120,121,121),
-                cvScalar(83,84,85),
+                cvScalar(240,245,245),
+                cvScalar(201,201,200),
+                cvScalar(161,161,160),
+                cvScalar(121,121,120),
+                cvScalar(85,84,83),
                 cvScalar(50,50,50)
             }
         };
@@ -213,6 +225,58 @@ IplImage * find_macbeth( const char *img )
                 if(CV_IS_SEQ_HOLE(c) && rect.width*rect.height >= min_size) {
                     CvSeq * quad_contour = find_quad(c, storage, min_size);
                     if(quad_contour) {
+                        rect = ((CvContour*)quad_contour)->rect;
+                        
+                        CvScalar average = cvScalarAll(0);
+                        int count = 0;
+                        for(int x = rect.x; x < (rect.x+rect.width); x++) {
+                            for(int y = rect.y; y < (rect.y+rect.height); y++) {
+                                if(cvPointPolygonTest(quad_contour, cvPointTo32f(cvPoint(x,y)),0) == 100) {
+                                    CvScalar s = cvGet2D(macbeth_img,y,x);
+                                    average.val[0] += s.val[0];
+                                    average.val[1] += s.val[1];
+                                    average.val[2] += s.val[2];
+                                    // printf("B=%f, G=%f, R=%f\n",s.val[0],s.val[1],s.val[2]);
+                                    
+                                    count++;
+                                }
+                            }
+                        }
+                        
+                        CvBox2D box = cvMinAreaRect2(quad_contour,storage);
+                        printf("Center: %f %f\n", box.center.x, box.center.y);
+                        
+                        for(int i = 0; i < 3; i++){
+                            average.val[i] /= count;
+                        }
+                        printf("Average color: %f %f %f\n",
+                            average.val[2],
+                            average.val[1],
+                            average.val[0]
+                        );
+                        
+                        double min_distance = MAX_RGB_DISTANCE;
+                        CvPoint closest_color_idx = cvPoint(-1,-1);
+                        for(int y = 0; y < MACBETH_HEIGHT; y++) {
+                            for(int x = 0; x < MACBETH_WIDTH; x++) {
+                                double distance = euclidean_distance(average,colorchecker_srgb[y][x]);
+                                if(distance < min_distance) {
+                                    closest_color_idx.x = x;
+                                    closest_color_idx.y = y;
+                                    min_distance = distance;
+                                }
+                            }
+                        }
+                        
+                        CvScalar closest_color = colorchecker_srgb[closest_color_idx.y][closest_color_idx.x];
+                        printf("Closest color: %f %f %f (%d %d)\n",
+                            closest_color.val[2],
+                            closest_color.val[1],
+                            closest_color.val[0],
+                            closest_color_idx.x,
+                            closest_color_idx.y
+                        );
+                        
                         cvDrawContours(
                             macbeth_img,
                             quad_contour,
@@ -220,6 +284,27 @@ IplImage * find_macbeth( const char *img )
                             cvScalar(0,0,255),
                             0,
                             element_size
+                        );
+                        cvCircle(
+                            macbeth_img,
+                            cvPointFrom32f(box.center),
+                            element_size*6,
+                            cvScalarAll(255),
+                            -1
+                        );
+                        cvCircle(
+                            macbeth_img,
+                            cvPointFrom32f(box.center),
+                            element_size*4,
+                            closest_color,
+                            -1
+                        );
+                        cvCircle(
+                            macbeth_img,
+                            cvPointFrom32f(box.center),
+                            element_size*2,
+                            average,
+                            -1
                         );
                     }
                 }
