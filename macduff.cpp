@@ -6,6 +6,77 @@
 #define MACBETH_HEIGHT  4
 #define MACBETH_SQUARES MACBETH_WIDTH * MACBETH_HEIGHT
 
+#define MAX_CONTOUR_APPROX  7
+
+CvSeq * find_quad( CvSeq * src_contour, CvMemStorage *storage, int min_size)
+{
+    // stolen from icvGenerateQuads
+    CvMemStorage * temp_storage = cvCreateChildMemStorage( storage );
+    
+    int flags = CV_CALIB_CB_FILTER_QUADS;
+    CvSeq *dst_contour = 0;
+    
+    const int min_approx_level = 2, max_approx_level = MAX_CONTOUR_APPROX;
+    int approx_level;
+    for( approx_level = min_approx_level; approx_level <= max_approx_level; approx_level++ )
+    {
+        dst_contour = cvApproxPoly( src_contour, sizeof(CvContour), temp_storage,
+                                    CV_POLY_APPROX_DP, (float)approx_level );
+        // we call this again on its own output, because sometimes
+        // cvApproxPoly() does not simplify as much as it should.
+        dst_contour = cvApproxPoly( dst_contour, sizeof(CvContour), temp_storage,
+                                    CV_POLY_APPROX_DP, (float)approx_level );
+
+        if( dst_contour->total == 4 )
+            break;
+    }
+
+    // reject non-quadrangles
+    if( dst_contour->total == 4 && cvCheckContourConvexity(dst_contour) )
+    {
+        CvPoint pt[4];
+        double d1, d2, p = cvContourPerimeter(dst_contour);
+        double area = fabs(cvContourArea(dst_contour, CV_WHOLE_SEQ));
+        double dx, dy;
+
+        for( int i = 0; i < 4; i++ )
+            pt[i] = *(CvPoint*)cvGetSeqElem(dst_contour, i);
+
+        dx = pt[0].x - pt[2].x;
+        dy = pt[0].y - pt[2].y;
+        d1 = sqrt(dx*dx + dy*dy);
+
+        dx = pt[1].x - pt[3].x;
+        dy = pt[1].y - pt[3].y;
+        d2 = sqrt(dx*dx + dy*dy);
+
+        // philipg.  Only accept those quadrangles which are more square
+        // than rectangular and which are big enough
+        double d3, d4;
+        dx = pt[0].x - pt[1].x;
+        dy = pt[0].y - pt[1].y;
+        d3 = sqrt(dx*dx + dy*dy);
+        dx = pt[1].x - pt[2].x;
+        dy = pt[1].y - pt[2].y;
+        d4 = sqrt(dx*dx + dy*dy);
+        if( !(flags & CV_CALIB_CB_FILTER_QUADS) ||
+            (d3*4 > d4 && d4*4 > d3 && d3*d4 < area*1.5 && area > min_size &&
+            d1 >= 0.15 * p && d2 >= 0.15 * p) )
+        {
+            // CvContourEx* parent = (CvContourEx*)(src_contour->v_prev);
+            // parent->counter++;
+            // if( !board || board->counter < parent->counter )
+            //     board = parent;
+            // dst_contour->v_prev = (CvSeq*)parent;
+            //for( i = 0; i < 4; i++ ) cvLine( debug_img, pt[i], pt[(i+1)&3], cvScalar(200,255,255), 1, CV_AA, 0 );
+            // cvSeqPush( root, &dst_contour );
+            return dst_contour;
+        }
+    }
+    
+    return NULL;
+}
+
 IplImage * find_macbeth( const char *img )
 {
     IplImage * macbeth_img = cvLoadImage( img,
@@ -140,14 +211,17 @@ IplImage * find_macbeth( const char *img )
             for( CvSeq* c = contours; c != NULL; c = c->h_next) {
                 CvRect rect = ((CvContour*)c)->rect;
                 if(CV_IS_SEQ_HOLE(c) && rect.width*rect.height >= min_size) {
-                    cvDrawContours(
-                        macbeth_img,
-                        c,
-                        cvScalar(255,0,0),
-                        cvScalar(0,0,255),
-                        0,
-                        element_size
-                    );
+                    CvSeq * quad_contour = find_quad(c, storage, min_size);
+                    if(quad_contour) {
+                        cvDrawContours(
+                            macbeth_img,
+                            quad_contour,
+                            cvScalar(255,0,0),
+                            cvScalar(0,0,255),
+                            0,
+                            element_size
+                        );
+                    }
                 }
             }
         }
