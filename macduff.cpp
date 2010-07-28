@@ -86,6 +86,8 @@ IplImage * find_macbeth( const char *img )
             cvReleaseImage( &(macbeth_split_thresh[i]) );
         }
         
+        IplImage * macbeth_masked = cvCreateImage( cvSize(macbeth_img->width, macbeth_img->height), macbeth_img->depth, macbeth_img->nChannels );
+        
         int element_size = (block_size/10)+2;
         printf("Using %d as element size\n", element_size);
         
@@ -99,19 +101,44 @@ IplImage * find_macbeth( const char *img )
             storage,
             CV_HOUGH_PROBABILISTIC,
             1,
-            CV_PI/180, block_size*4, block_size*10,
-            block_size
+            CV_PI/180, block_size*8, block_size*5,
+            block_size*20
         );
         
         printf("%d lines\n",results->total);
         for(int i = 0; i < results->total; i++) {
             CvPoint* line = (CvPoint*)cvGetSeqElem(results, i);
-            cvLine(macbeth_img, line[0], line[1], CV_RGB( rand()&255, rand()&255, rand()&255 ), 5);
+            
+            double slope = ((double)(line[0].y - line[1].y))/((double)(line[0].x - line[1].x));
+            double x_amount = cos(1./slope) * element_size * 8;
+            double y_amount = sin(1./slope) * element_size * 8;
+            
+            for(int i = 0; i < 2; i++) {
+                CvPoint this_line[2];
+                if(i % 2) {
+                    x_amount *= -1;
+                    y_amount *= -1;
+                }
+                this_line[0].x = line[0].x - x_amount;
+                this_line[1].x = line[1].x - x_amount;
+                this_line[0].y = line[0].y + y_amount;
+                this_line[1].y = line[1].y + y_amount;
+                
+                // cvLine(macbeth_img, this_line[0], this_line[1], CV_RGB( rand()&255, rand()&255, rand()&255 ), element_size);
+            }
+            
+            cvLine(macbeth_img, line[0], line[1], CV_RGB( rand()&255, rand()&255, rand()&255 ), element_size-2);
         }
+        CvCBQuad *quads = 0;
         
         cvReleaseMemStorage( &storage );
         
-        return macbeth_img;
+        cvSetZero(macbeth_masked);
+        cvNot(adaptive,adaptive);
+        cvCopy( macbeth_img, macbeth_masked, adaptive );
+        cvNot(adaptive,adaptive);
+        
+        return macbeth_masked;
     }
 
     if( macbeth_img ) cvReleaseImage( &macbeth_img );
