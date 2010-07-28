@@ -38,7 +38,7 @@ IplImage * find_macbeth( const char *img )
         cvOr(macbeth_split_thresh[0],macbeth_split_thresh[1],adaptive);
         cvOr(macbeth_split_thresh[2],adaptive,adaptive);
         
-        cvReleaseImage( &macbeth_img );
+        // cvReleaseImage( &macbeth_img );
         
         for(int i = 0; i < 3; i++) {
             cvReleaseImage( &(macbeth_split[i]) );
@@ -52,7 +52,25 @@ IplImage * find_macbeth( const char *img )
         cvMorphologyEx(adaptive,adaptive,NULL,element,CV_MOP_OPEN);
         cvReleaseStructuringElement(&element);
         
-        return adaptive;
+        CvMemStorage* storage = cvCreateMemStorage(0);
+        CvSeq* results = cvHoughLines2(
+            adaptive,
+            storage,
+            CV_HOUGH_PROBABILISTIC,
+            1,
+            CV_PI/180, block_size*4, block_size*10,
+            block_size
+        );
+        
+        printf("%d lines\n",results->total);
+        for(int i = 0; i < results->total; i++) {
+            CvPoint* line = (CvPoint*)cvGetSeqElem(results, i);
+            cvLine(macbeth_img, line[0], line[1], CV_RGB( rand()&255, rand()&255, rand()&255 ), 5);
+        }
+        
+        cvReleaseMemStorage( &storage );
+        
+        return macbeth_img;
     }
 
     if( macbeth_img ) cvReleaseImage( &macbeth_img );
