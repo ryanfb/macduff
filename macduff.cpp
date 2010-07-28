@@ -127,18 +127,39 @@ IplImage * find_macbeth( const char *img )
                 // cvLine(macbeth_img, this_line[0], this_line[1], CV_RGB( rand()&255, rand()&255, rand()&255 ), element_size);
             }
             
-            cvLine(macbeth_img, line[0], line[1], CV_RGB( rand()&255, rand()&255, rand()&255 ), element_size-2);
+            // cvLine(macbeth_img, line[0], line[1], CV_RGB( rand()&255, rand()&255, rand()&255 ), element_size-2);
         }
-        CvCBQuad *quads = 0;
+        
+        CvSeq * contours = NULL;
+        cvFindContours(adaptive,storage,&contours);
+        
+        int min_size = (macbeth_img->width*macbeth_img->height)/
+            (MACBETH_SQUARES*100);
+        
+        if(contours) {
+            for( CvSeq* c = contours; c != NULL; c = c->h_next) {
+                CvRect rect = ((CvContour*)c)->rect;
+                if(CV_IS_SEQ_HOLE(c) && rect.width*rect.height >= min_size) {
+                    cvDrawContours(
+                        macbeth_img,
+                        c,
+                        cvScalar(255,0,0),
+                        cvScalar(0,0,255),
+                        0,
+                        element_size
+                    );
+                }
+            }
+        }
         
         cvReleaseMemStorage( &storage );
         
-        cvSetZero(macbeth_masked);
-        cvNot(adaptive,adaptive);
-        cvCopy( macbeth_img, macbeth_masked, adaptive );
-        cvNot(adaptive,adaptive);
+        // cvSetZero(macbeth_masked);
+        // cvNot(adaptive,adaptive);
+        // cvCopy( macbeth_img, macbeth_masked, adaptive );
+        // cvNot(adaptive,adaptive);
         
-        return macbeth_masked;
+        return macbeth_img;
     }
 
     if( macbeth_img ) cvReleaseImage( &macbeth_img );
