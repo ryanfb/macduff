@@ -2,13 +2,54 @@
 #include <opencv/cv.h>
 #include <opencv/highgui.h>
 
-#define MACBETH_SQUARES 24
+#define MACBETH_WIDTH   6
+#define MACBETH_HEIGHT  4
+#define MACBETH_SQUARES MACBETH_WIDTH * MACBETH_HEIGHT
 
 IplImage * find_macbeth( const char *img )
 {
     IplImage * macbeth_img = cvLoadImage( img,
         CV_LOAD_IMAGE_ANYCOLOR|CV_LOAD_IMAGE_ANYDEPTH );
     
+    
+    // BabelColor averages in sRGB:
+    //   http://www.babelcolor.com/main_level/ColorChecker.htm
+    CvScalar colorchecker_srgb[MACBETH_HEIGHT][MACBETH_WIDTH] =
+        {
+            {
+                cvScalar(115,81,67),
+                cvScalar(196,149,129),
+                cvScalar(93,123,157),
+                cvScalar(90,108,65),
+                cvScalar(130,129,176),
+                cvScalar(99,191,171)
+            },
+            {
+                cvScalar(220,123,45),
+                cvScalar(72,92,168),
+                cvScalar(195,84,98),
+                cvScalar(91,59,105),
+                cvScalar(160,189,62),
+                cvScalar(229,161,41)
+            },
+            {
+                cvScalar(43,62,147),
+                cvScalar(71,149,72),
+                cvScalar(176,48,56),
+                cvScalar(238,200,22),
+                cvScalar(188,84,150),
+                cvScalar(0,136,166)
+            },
+            {
+                cvScalar(245,245,240),
+                cvScalar(200,201,201),
+                cvScalar(160,161,161),
+                cvScalar(120,121,121),
+                cvScalar(83,84,85),
+                cvScalar(50,50,50)
+            }
+        };
+        
     IplImage * macbeth_split[3];
     IplImage * macbeth_split_thresh[3];
     
