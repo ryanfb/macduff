@@ -26,6 +26,7 @@ IplImage * find_macbeth( const char *img )
         int block_size = cvRound(
             MIN(macbeth_img->width,macbeth_img->height)*0.02)|1;
         printf("Using %d as block size\n", block_size);
+        
         double offset = 7;
         
         for(int i = 0; i < 3; i++) {
@@ -43,6 +44,13 @@ IplImage * find_macbeth( const char *img )
             cvReleaseImage( &(macbeth_split[i]) );
             cvReleaseImage( &(macbeth_split_thresh[i]) );
         }
+        
+        int element_size = (block_size/10)+2;
+        printf("Using %d as element size\n", element_size);
+        
+        IplConvKernel * element = cvCreateStructuringElementEx(element_size,element_size,element_size/2,element_size/2,CV_SHAPE_RECT);
+        cvMorphologyEx(adaptive,adaptive,NULL,element,CV_MOP_OPEN);
+        cvReleaseStructuringElement(&element);
         
         return adaptive;
     }
