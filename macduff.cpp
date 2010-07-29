@@ -33,6 +33,14 @@ double euclidean_distance_lab(CvScalar p_1, CvScalar p_2)
     return euclidean_distance(p_1, p_2);
 }
 
+CvRect contained_rectangle(CvBox2D box)
+{
+    return cvRect(box.center.x - box.size.width/4,
+                  box.center.y - box.size.height/4,
+                  box.size.width/2,
+                  box.size.height/2);
+}
+
 CvScalar contour_average(CvContour* contour, IplImage* image)
 {
     CvRect rect = ((CvContour*)contour)->rect;
@@ -221,7 +229,7 @@ IplImage * find_macbeth( const char *img )
         
         CvMemStorage* storage = cvCreateMemStorage(0);
         
-        CvSeq* stack = cvCreateSeq( 0, sizeof(*stack), sizeof(void*), storage );
+        CvSeq* initial_quads = cvCreateSeq( 0, sizeof(*initial_quads), sizeof(void*), storage );
         
         CvSeq * contours = NULL;
         cvFindContours(adaptive,storage,&contours);
@@ -230,17 +238,21 @@ IplImage * find_macbeth( const char *img )
             (MACBETH_SQUARES*100);
         
         if(contours) {
+            int count = 0;
+            
             for( CvSeq* c = contours; c != NULL; c = c->h_next) {
                 CvRect rect = ((CvContour*)c)->rect;
                 if(CV_IS_SEQ_HOLE(c) && rect.width*rect.height >= min_size) {
                     CvSeq * quad_contour = find_quad(c, storage, min_size);
                     if(quad_contour) {
+                        cvSeqPush( initial_quads, &quad_contour );
+                        count++;
                         rect = ((CvContour*)quad_contour)->rect;
                         
                         CvScalar average = contour_average((CvContour*)quad_contour, macbeth_img);
                         
                         CvBox2D box = cvMinAreaRect2(quad_contour,storage);
-                        printf("Center: %f %f\n", box.center.x, box.center.y);
+                        // printf("Center: %f %f\n", box.center.x, box.center.y);
                         
                         double min_distance = MAX_RGB_DISTANCE;
                         CvPoint closest_color_idx = cvPoint(-1,-1);
@@ -256,13 +268,13 @@ IplImage * find_macbeth( const char *img )
                         }
                         
                         CvScalar closest_color = colorchecker_srgb[closest_color_idx.y][closest_color_idx.x];
-                        printf("Closest color: %f %f %f (%d %d)\n",
-                            closest_color.val[2],
-                            closest_color.val[1],
-                            closest_color.val[0],
-                            closest_color_idx.x,
-                            closest_color_idx.y
-                        );
+                        // printf("Closest color: %f %f %f (%d %d)\n",
+                        //     closest_color.val[2],
+                        //     closest_color.val[1],
+                        //     closest_color.val[0],
+                        //     closest_color_idx.x,
+                        //     closest_color_idx.y
+                        // );
                         
                         cvDrawContours(
                             macbeth_img,
@@ -293,8 +305,52 @@ IplImage * find_macbeth( const char *img )
                             average,
                             -1
                         );
+                        CvRect rect = contained_rectangle(box);
+                        // cvRectangle(
+                        //     macbeth_img,
+                        //     cvPoint(rect.x,rect.y),
+                        //     cvPoint(rect.x+rect.width, rect.y+rect.height),
+                        //     cvScalarAll(0),
+                        //     element_size
+                        // );
                     }
                 }
+            }
+            printf("%d initial quads found", initial_quads->total);
+            if(count > MACBETH_SQUARES) {
+                printf(" (probably a Passport)\n");
+                
+                CvMat* points = cvCreateMat( initial_quads->total , 1, CV_32FC2 );
+                CvMat* clusters = cvCreateMat( initial_quads->total , 1, CV_32SC1 );
+                
+                for(int i = 0; i < initial_quads->total; i++) {
+                    CvContour* contour = (CvContour*)(*(CvSeq**)cvGetSeqElem(initial_quads, i));
+                    CvBox2D box = cvMinAreaRect2(contour,storage);
+                    cvSet1D(points, i, cvScalar(box.center.x,box.center.y));
+                }
+                
+                // partition into two clusters: passport and colorchecker
+                cvKMeans2( points, 2, clusters, 
+                           cvTermCriteria( CV_TERMCRIT_EPS+CV_TERMCRIT_ITER,
+                                           10, 1.0 ) );
+                                           
+                for(int i = 0; i < initial_quads->total; i++) {
+                    CvPoint2D32f pt = ((CvPoint2D32f*)points->data.fl)[i];
+                    int cluster_idx = clusters->data.i[i];
+                    cvCircle(
+                        macbeth_img,
+                        cvPointFrom32f(pt),
+                        element_size*2,
+                        cvScalar(255*cluster_idx,0,255-(255*cluster_idx)),
+                        -1
+                    );
+                }
+                
+                cvReleaseMat( &points );
+                cvReleaseMat( &clusters );
+            }
+            else {
+                printf("\n");
             }
         }
         
