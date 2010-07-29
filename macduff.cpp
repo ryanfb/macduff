@@ -186,7 +186,7 @@ IplImage * find_macbeth( const char *img )
     
     if( macbeth_img )
     {
-        int adaptive_method = CV_ADAPTIVE_THRESH_GAUSSIAN_C;
+        int adaptive_method = CV_ADAPTIVE_THRESH_MEAN_C;
         int threshold_type = CV_THRESH_BINARY_INV;
         int block_size = cvRound(
             MIN(macbeth_img->width,macbeth_img->height)*0.02)|1;
