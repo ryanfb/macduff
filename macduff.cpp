@@ -192,7 +192,7 @@ IplImage * find_macbeth( const char *img )
             MIN(macbeth_img->width,macbeth_img->height)*0.02)|1;
         printf("Using %d as block size\n", block_size);
         
-        double offset = 7;
+        double offset = 6;
         
         for(int i = 0; i < 3; i++) {
             cvAdaptiveThreshold(macbeth_split[i], macbeth_split_thresh[i], 255, adaptive_method, threshold_type, block_size, offset);
