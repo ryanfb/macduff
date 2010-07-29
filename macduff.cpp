@@ -10,6 +10,45 @@
 
 #define MAX_RGB_DISTANCE 444
 
+// BabelColor averages in sRGB:
+//   http://www.babelcolor.com/main_level/ColorChecker.htm
+// (converted to BGR order for comparison)
+CvScalar colorchecker_srgb[MACBETH_HEIGHT][MACBETH_WIDTH] =
+    {
+        {
+            cvScalar(67,81,115),
+            cvScalar(129,149,196),
+            cvScalar(157,123,93),
+            cvScalar(65,108,90),
+            cvScalar(176,129,130),
+            cvScalar(171,191,99)
+        },
+        {
+            cvScalar(45,123,220),
+            cvScalar(168,92,72),
+            cvScalar(98,84,195),
+            cvScalar(105,59,91),
+            cvScalar(62,189,160),
+            cvScalar(41,161,229)
+        },
+        {
+            cvScalar(147,62,43),
+            cvScalar(72,149,71),
+            cvScalar(56,48,176),
+            cvScalar(22,200,238),
+            cvScalar(150,84,188),
+            cvScalar(166,136,0)
+        },
+        {
+            cvScalar(240,245,245),
+            cvScalar(201,201,200),
+            cvScalar(161,161,160),
+            cvScalar(121,121,120),
+            cvScalar(85,84,83),
+            cvScalar(50,50,50)
+        }
+    };
+
 double euclidean_distance(CvScalar p_1, CvScalar p_2)
 {   
     double sum = 0;
@@ -17,6 +56,11 @@ double euclidean_distance(CvScalar p_1, CvScalar p_2)
         sum += pow(p_1.val[i]-p_2.val[i],2.);
     }
     return sqrt(sum);
+}
+
+double euclidean_distance(CvPoint p_1, CvPoint p_2)
+{
+    return euclidean_distance(cvScalar(p_1.x,p_1.y,0),cvScalar(p_2.x,p_2.y,0));
 }
 
 double euclidean_distance_lab(CvScalar p_1, CvScalar p_2)
@@ -66,6 +110,31 @@ CvScalar contour_average(CvContour* contour, IplImage* image)
     }
     
     return average;
+}
+
+void * cvBox(CvBox2D box, IplImage *image, CvScalar color, int thickness)
+{
+    CvPoint2D32f pt[4];
+    
+    cvBoxPoints(box, pt);
+    
+    for(int i = 0; i < 4; i++) {
+        cvLine(image, cvPointFrom32f(pt[i]), cvPointFrom32f(pt[(i+1)%4]), color, thickness);
+        cvCircle(image, cvPointFrom32f(pt[i]), thickness, cvScalarAll((255/4)*i), -1);
+    }
+}
+
+void * find_colorchecker(CvSeq * quads, CvSeq * boxes, CvMemStorage *storage, IplImage *image)
+{
+    CvMat* points = cvCreateMat( boxes->total , 1, CV_32FC2 );
+    for(int i = 0; i < boxes->total; i++)
+    {
+        CvBox2D box = (*(CvBox2D*)cvGetSeqElem(boxes, i));
+        cvSet1D(points, i, cvScalar(box.center.x,box.center.y));
+    }
+    CvBox2D passport_box = cvMinAreaRect2(points,storage);
+
+    cvBox(passport_box, image, cvScalarAll(128), 10);
 }
 
 CvSeq * find_quad( CvSeq * src_contour, CvMemStorage *storage, int min_size)
@@ -141,46 +210,6 @@ IplImage * find_macbeth( const char *img )
 {
     IplImage * macbeth_img = cvLoadImage( img,
         CV_LOAD_IMAGE_ANYCOLOR|CV_LOAD_IMAGE_ANYDEPTH );
-    
-    
-    // BabelColor averages in sRGB:
-    //   http://www.babelcolor.com/main_level/ColorChecker.htm
-    // (converted to BGR order for comparison)
-    CvScalar colorchecker_srgb[MACBETH_HEIGHT][MACBETH_WIDTH] =
-        {
-            {
-                cvScalar(67,81,115),
-                cvScalar(129,149,196),
-                cvScalar(157,123,93),
-                cvScalar(65,108,90),
-                cvScalar(176,129,130),
-                cvScalar(171,191,99)
-            },
-            {
-                cvScalar(45,123,220),
-                cvScalar(168,92,72),
-                cvScalar(98,84,195),
-                cvScalar(105,59,91),
-                cvScalar(62,189,160),
-                cvScalar(41,161,229)
-            },
-            {
-                cvScalar(147,62,43),
-                cvScalar(72,149,71),
-                cvScalar(56,48,176),
-                cvScalar(22,200,238),
-                cvScalar(150,84,188),
-                cvScalar(166,136,0)
-            },
-            {
-                cvScalar(240,245,245),
-                cvScalar(201,201,200),
-                cvScalar(161,161,160),
-                cvScalar(121,121,120),
-                cvScalar(85,84,83),
-                cvScalar(50,50,50)
-            }
-        };
         
     IplImage * macbeth_split[3];
     IplImage * macbeth_split_thresh[3];
@@ -230,6 +259,7 @@ IplImage * find_macbeth( const char *img )
         CvMemStorage* storage = cvCreateMemStorage(0);
         
         CvSeq* initial_quads = cvCreateSeq( 0, sizeof(*initial_quads), sizeof(void*), storage );
+        CvSeq* initial_boxes = cvCreateSeq( 0, sizeof(*initial_boxes), sizeof(void*), storage );
         
         CvSeq * contours = NULL;
         cvFindContours(adaptive,storage,&contours);
@@ -252,6 +282,8 @@ IplImage * find_macbeth( const char *img )
                         CvScalar average = contour_average((CvContour*)quad_contour, macbeth_img);
                         
                         CvBox2D box = cvMinAreaRect2(quad_contour,storage);
+                        cvSeqPush( initial_boxes, &box );
+                        
                         // printf("Center: %f %f\n", box.center.x, box.center.y);
                         
                         double min_distance = MAX_RGB_DISTANCE;
@@ -320,12 +352,21 @@ IplImage * find_macbeth( const char *img )
             if(count > MACBETH_SQUARES) {
                 printf(" (probably a Passport)\n");
                 
+                CvSeq* partitioned_quads[2];
+                CvSeq* partitioned_boxes[2];
+                for(int i = 0; i < 2; i++) {
+                    partitioned_quads[i] = cvCreateSeq( 0, sizeof(**partitioned_quads), sizeof(void*), storage );
+                    partitioned_boxes[i] = cvCreateSeq( 0, sizeof(**partitioned_boxes), sizeof(void*), storage );
+                }
+                
                 CvMat* points = cvCreateMat( initial_quads->total , 1, CV_32FC2 );
                 CvMat* clusters = cvCreateMat( initial_quads->total , 1, CV_32SC1 );
                 
                 for(int i = 0; i < initial_quads->total; i++) {
                     CvContour* contour = (CvContour*)(*(CvSeq**)cvGetSeqElem(initial_quads, i));
-                    CvBox2D box = cvMinAreaRect2(contour,storage);
+                    CvBox2D box = (*(CvBox2D*)cvGetSeqElem(initial_boxes, i));
+                    
+                    // CvBox2D box = cvMinAreaRect2(contour,storage);
                     cvSet1D(points, i, cvScalar(box.center.x,box.center.y));
                 }
                 
@@ -333,10 +374,16 @@ IplImage * find_macbeth( const char *img )
                 cvKMeans2( points, 2, clusters, 
                            cvTermCriteria( CV_TERMCRIT_EPS+CV_TERMCRIT_ITER,
                                            10, 1.0 ) );
-                                           
+        
                 for(int i = 0; i < initial_quads->total; i++) {
                     CvPoint2D32f pt = ((CvPoint2D32f*)points->data.fl)[i];
                     int cluster_idx = clusters->data.i[i];
+                    
+                    cvSeqPush( partitioned_quads[cluster_idx],
+                               cvGetSeqElem(initial_quads, i) );
+                    cvSeqPush( partitioned_boxes[cluster_idx],
+                               cvGetSeqElem(initial_boxes, i) );
+
                     cvCircle(
                         macbeth_img,
                         cvPointFrom32f(pt),
@@ -346,11 +393,18 @@ IplImage * find_macbeth( const char *img )
                     );
                 }
                 
+                for(int i = 0; i < 2; i++) {
+                    find_colorchecker(partitioned_quads[i], partitioned_boxes[i],
+                                      storage, macbeth_img);
+                }
+                
                 cvReleaseMat( &points );
                 cvReleaseMat( &clusters );
             }
             else {
                 printf("\n");
+                find_colorchecker(initial_quads, initial_boxes,
+                                  storage, macbeth_img);
             }
         }
         
