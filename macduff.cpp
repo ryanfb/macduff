@@ -112,7 +112,7 @@ CvSeq * find_quad( CvSeq * src_contour, CvMemStorage *storage, int min_size)
         dy = pt[1].y - pt[2].y;
         d4 = sqrt(dx*dx + dy*dy);
         if( !(flags & CV_CALIB_CB_FILTER_QUADS) ||
-            (d3*4 > d4 && d4*4 > d3 && d3*d4 < area*1.5 && area > min_size &&
+            (d3*1.1 > d4 && d4*1.1 > d3 && d3*d4 < area*1.5 && area > min_size &&
             d1 >= 0.15 * p && d2 >= 0.15 * p) )
         {
             // CvContourEx* parent = (CvContourEx*)(src_contour->v_prev);
