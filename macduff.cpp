@@ -220,7 +220,7 @@ ColorChecker find_colorchecker(CvSeq * quads, CvSeq * boxes, CvMemStorage *stora
     CvBox2D passport_box = cvMinAreaRect2(points,storage);
     cvBoxPoints(passport_box, box_corners);
     
-    cvBox(passport_box, image, cvScalarAll(128), 10);
+    // cvBox(passport_box, image, cvScalarAll(128), 10);
     
     for(int i = 0; i < 4; i++) {
         printf("%f %f\n", box_corners[i].x, box_corners[i].y);
@@ -283,13 +283,13 @@ ColorChecker find_colorchecker(CvSeq * quads, CvSeq * boxes, CvMemStorage *stora
             rect.x = rect.x - average_size / 2;
             rect.y = rect.y - average_size / 2;
             
-            cvRectangle(
-                image,
-                cvPoint(rect.x,rect.y),
-                cvPoint(rect.x+rect.width, rect.y+rect.height),
-                cvScalarAll(0),
-                10
-            );
+            // cvRectangle(
+            //     image,
+            //     cvPoint(rect.x,rect.y),
+            //     cvPoint(rect.x+rect.width, rect.y+rect.height),
+            //     cvScalarAll(0),
+            //     10
+            // );
             
             CvScalar average_color = rect_average(rect, original_image);
             
@@ -497,14 +497,14 @@ IplImage * find_macbeth( const char *img )
                         //     closest_color_idx.y
                         // );
                         
-                        cvDrawContours(
-                            macbeth_img,
-                            quad_contour,
-                            cvScalar(255,0,0),
-                            cvScalar(0,0,255),
-                            0,
-                            element_size
-                        );
+                        // cvDrawContours(
+                        //     macbeth_img,
+                        //     quad_contour,
+                        //     cvScalar(255,0,0),
+                        //     cvScalar(0,0,255),
+                        //     0,
+                        //     element_size
+                        // );
                         // cvCircle(
                         //     macbeth_img,
                         //     cvPointFrom32f(box.center),
@@ -512,20 +512,20 @@ IplImage * find_macbeth( const char *img )
                         //     cvScalarAll(255),
                         //     -1
                         // );
-                        cvCircle(
-                            macbeth_img,
-                            cvPointFrom32f(box.center),
-                            element_size*6,
-                            closest_color,
-                            -1
-                        );
-                        cvCircle(
-                            macbeth_img,
-                            cvPointFrom32f(box.center),
-                            element_size*4,
-                            average,
-                            -1
-                        );
+                        // cvCircle(
+                        //     macbeth_img,
+                        //     cvPointFrom32f(box.center),
+                        //     element_size*6,
+                        //     closest_color,
+                        //     -1
+                        // );
+                        // cvCircle(
+                        //     macbeth_img,
+                        //     cvPointFrom32f(box.center),
+                        //     element_size*4,
+                        //     average,
+                        //     -1
+                        // );
                         // CvRect rect = contained_rectangle(box);
                         // cvRectangle(
                         //     macbeth_img,
@@ -576,13 +576,13 @@ IplImage * find_macbeth( const char *img )
                     cvSeqPush( partitioned_boxes[cluster_idx],
                                cvGetSeqElem(initial_boxes, i) );
 
-                    cvCircle(
-                        macbeth_img,
-                        cvPointFrom32f(pt),
-                        element_size*2,
-                        cvScalar(255*cluster_idx,0,255-(255*cluster_idx)),
-                        -1
-                    );
+                    // cvCircle(
+                    //     macbeth_img,
+                    //     cvPointFrom32f(pt),
+                    //     element_size*2,
+                    //     cvScalar(255*cluster_idx,0,255-(255*cluster_idx)),
+                    //     -1
+                    // );
                 }
                 
                 ColorChecker partitioned_checkers[2];
