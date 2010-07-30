@@ -200,7 +200,14 @@ void * draw_colorchecker(CvMat * colorchecker_values, CvMat * colorchecker_point
     }
 }
 
-void * find_colorchecker(CvSeq * quads, CvSeq * boxes, CvMemStorage *storage, IplImage *image, IplImage *original_image)
+struct ColorChecker {
+    double error;
+    CvMat * values;
+    CvMat * points;
+    double size;
+};
+
+ColorChecker find_colorchecker(CvSeq * quads, CvSeq * boxes, CvMemStorage *storage, IplImage *image, IplImage *original_image)
 {
     CvPoint2D32f box_corners[4];
     
@@ -287,9 +294,7 @@ void * find_colorchecker(CvSeq * quads, CvSeq * boxes, CvMemStorage *storage, Ip
             CvScalar average_color = rect_average(rect, original_image);
             
             cvSet2D(this_colorchecker,y,x,average_color);
-            printf("%.0f %.0f %.0f\t\t",average_color.val[0],average_color.val[1],average_color.val[2]);
         }
-        printf("\n");
     }
     
     double orient_1_error = check_colorchecker(this_colorchecker);
@@ -306,10 +311,16 @@ void * find_colorchecker(CvSeq * quads, CvSeq * boxes, CvMemStorage *storage, Ip
         cvFlip(this_colorchecker_points,NULL,-1);
     }
     
-    draw_colorchecker(this_colorchecker,this_colorchecker_points,image,average_size);
+    // draw_colorchecker(this_colorchecker,this_colorchecker_points,image,average_size);
     
-    cvReleaseMat( &this_colorchecker );
-    cvReleaseMat( &this_colorchecker_points );
+    ColorChecker found_colorchecker;
+    
+    found_colorchecker.error = MIN(orient_1_error,orient_2_error);
+    found_colorchecker.values = this_colorchecker;
+    found_colorchecker.points = this_colorchecker_points;
+    found_colorchecker.size = average_size;
+    
+    return found_colorchecker;
 }
 
 CvSeq * find_quad( CvSeq * src_contour, CvMemStorage *storage, int min_size)
@@ -526,6 +537,8 @@ IplImage * find_macbeth( const char *img )
                     }
                 }
             }
+            
+            ColorChecker found_colorchecker;
 
             printf("%d initial quads found", initial_quads->total);
             if(count > MACBETH_SQUARES) {
@@ -572,21 +585,30 @@ IplImage * find_macbeth( const char *img )
                     );
                 }
                 
+                ColorChecker partitioned_checkers[2];
+                
                 for(int i = 0; i < 2; i++) {
-                    find_colorchecker(partitioned_quads[i], partitioned_boxes[i],
+                    partitioned_checkers[i] =
+                        find_colorchecker(partitioned_quads[i], partitioned_boxes[i],
                                       storage, macbeth_img, macbeth_original);
                 }
+                
+                found_colorchecker = partitioned_checkers[0].error < partitioned_checkers[1].error ?
+                    partitioned_checkers[0] : partitioned_checkers[1];
                 
                 cvReleaseMat( &points );
                 cvReleaseMat( &clusters );
             }
             else {
                 printf("\n");
-                find_colorchecker(initial_quads, initial_boxes,
+                found_colorchecker = find_colorchecker(initial_quads, initial_boxes,
                                   storage, macbeth_img, macbeth_original);
             }
+            
+            draw_colorchecker(found_colorchecker.values,found_colorchecker.points,macbeth_img,found_colorchecker.size);
+            
         }
-        
+                
         cvReleaseMemStorage( &storage );
         
         // cvSetZero(macbeth_masked);
