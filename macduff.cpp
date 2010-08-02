@@ -410,15 +410,17 @@ IplImage * find_macbeth( const char *img )
         
         double offset = 6;
         
+        // do an adaptive threshold on each channel
         for(int i = 0; i < 3; i++) {
             cvAdaptiveThreshold(macbeth_split[i], macbeth_split_thresh[i], 255, adaptive_method, threshold_type, block_size, offset);
         }
         
         IplImage * adaptive = cvCreateImage( cvSize(macbeth_img->width, macbeth_img->height), IPL_DEPTH_8U, 1 );
         
+        // OR the binary threshold results together
         cvOr(macbeth_split_thresh[0],macbeth_split_thresh[1],adaptive);
         cvOr(macbeth_split_thresh[2],adaptive,adaptive);
-                
+        
         for(int i = 0; i < 3; i++) {
             cvReleaseImage( &(macbeth_split[i]) );
             cvReleaseImage( &(macbeth_split_thresh[i]) );
@@ -427,6 +429,7 @@ IplImage * find_macbeth( const char *img )
         int element_size = (block_size/10)+2;
         fprintf(stderr,"Using %d as element size\n", element_size);
         
+        // do an opening on the threshold image
         IplConvKernel * element = cvCreateStructuringElementEx(element_size,element_size,element_size/2,element_size/2,CV_SHAPE_RECT);
         cvMorphologyEx(adaptive,adaptive,NULL,element,CV_MOP_OPEN);
         cvReleaseStructuringElement(&element);
@@ -436,6 +439,7 @@ IplImage * find_macbeth( const char *img )
         CvSeq* initial_quads = cvCreateSeq( 0, sizeof(*initial_quads), sizeof(void*), storage );
         CvSeq* initial_boxes = cvCreateSeq( 0, sizeof(*initial_boxes), sizeof(CvBox2D), storage );
         
+        // find contours in the threshold image
         CvSeq * contours = NULL;
         cvFindContours(adaptive,storage,&contours);
         
@@ -447,7 +451,9 @@ IplImage * find_macbeth( const char *img )
             
             for( CvSeq* c = contours; c != NULL; c = c->h_next) {
                 CvRect rect = ((CvContour*)c)->rect;
+                // only interested in contours with these restrictions
                 if(CV_IS_SEQ_HOLE(c) && rect.width*rect.height >= min_size) {
+                    // only interested in quad-like contours
                     CvSeq * quad_contour = find_quad(c, storage, min_size);
                     if(quad_contour) {
                         cvSeqPush( initial_quads, &quad_contour );
@@ -540,11 +546,10 @@ IplImage * find_macbeth( const char *img )
                     partitioned_boxes[i] = cvCreateSeq( 0, sizeof(**partitioned_boxes), sizeof(CvBox2D), storage );
                 }
                 
+                // set up the points sequence for cvKMeans2, using the box centers
                 for(int i = 0; i < initial_quads->total; i++) {
-                    CvContour* contour = (CvContour*)(*(CvSeq**)cvGetSeqElem(initial_quads, i));
                     CvBox2D box = (*(CvBox2D*)cvGetSeqElem(initial_boxes, i));
                     
-                    // CvBox2D box = cvMinAreaRect2(contour,storage);
                     cvSet1D(points, i, cvScalar(box.center.x,box.center.y));
                 }
                 
@@ -573,25 +578,30 @@ IplImage * find_macbeth( const char *img )
                 
                 ColorChecker partitioned_checkers[2];
                 
+                // check each of the two partitioned sets for the best colorchecker
                 for(int i = 0; i < 2; i++) {
                     partitioned_checkers[i] =
                         find_colorchecker(partitioned_quads[i], partitioned_boxes[i],
                                       storage, macbeth_img, macbeth_original);
                 }
                 
+                // use the colorchecker with the lowest error
                 found_colorchecker = partitioned_checkers[0].error < partitioned_checkers[1].error ?
                     partitioned_checkers[0] : partitioned_checkers[1];
                 
                 cvReleaseMat( &points );
                 cvReleaseMat( &clusters );
             }
-            else {
+            else { // just one colorchecker to test
                 fprintf(stderr,"\n");
                 found_colorchecker = find_colorchecker(initial_quads, initial_boxes,
                                   storage, macbeth_img, macbeth_original);
             }
             
+            // render the found colorchecker
             draw_colorchecker(found_colorchecker.values,found_colorchecker.points,macbeth_img,found_colorchecker.size);
+            
+            // print out the colorchecker info
             for(int y = 0; y < MACBETH_HEIGHT; y++) {            
                 for(int x = 0; x < MACBETH_WIDTH; x++) {
                     CvScalar this_value = cvGet2D(found_colorchecker.values,y,x);
@@ -624,6 +634,7 @@ int main( int argc, char *argv[] )
     if( argc < 2 )
     {
         fprintf( stderr, "Usage: %s image_file [output_image]\n", argv[0] );
+        return 1;
     }
 
     const char *img_file = argv[1];
