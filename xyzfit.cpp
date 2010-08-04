@@ -7,7 +7,11 @@
 #include <opencv/cv.h>
 #include <opencv/highgui.h>
 
+#include <armadillo>
+
 #include "colorchecker.h"
+
+using namespace arma;
 
 double rect_average(CvRect rect, IplImage* image)
 {       
@@ -119,6 +123,41 @@ int main( int argc, char *argv[] )
         
         cvReleaseImage( &input_channel );
     }
+    
+    mat P = zeros<mat>(MACBETH_SQUARES,3);
+    for(int i = 0; i < MACBETH_SQUARES; i++) {
+        for(int j = 0; j < 3; j++) {
+            P(i,j) = colorchecker_xyz[i][j];
+        }
+    }
+    
+    imat V = zeros<imat>(MACBETH_SQUARES,n);
+    for(int i = 0; i < MACBETH_SQUARES; i++) {
+        for(int j = 0; j < n; j++) {
+            V(i,j) = (int)round(colorchecker_channels[j][i]);
+        }
+    }
+    
+    P.print("P =");
+    V.print("V =");
+    
+    imat VT = trans(V);
+    VT.print("VT =");
+    
+    imat VTV = VT*V;
+    VTV.print("VTV =");
+    
+    mat VTP = VT*P;
+    VTP.print("VTP =");
+    
+    mat A = solve(conv_to<mat>::from(VTV), VT*P);
+    A.print("A =");
+    
+    // mat VTVinv = inv(conv_to<mat>::from(VTV));
+    // VTVinv.print("VTVinv =");
+    // 
+    // mat A = VTVinv * conv_to<mat>::from(VT) * P;
+    // 
     
     return 0;
 }
