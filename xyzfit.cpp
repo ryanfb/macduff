@@ -1,3 +1,7 @@
+#include <stdio.h>
+#include <opencv/cv.h>
+#include <opencv/highgui.h>
+
 // ColorChecker XYZ vendor information from 2005,
 // taken from http://www.babelcolor.com/main_level/ColorChecker.htm
 float colorchecker_xyz[24][3] = {
