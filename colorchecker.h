@@ -49,7 +49,7 @@ CvScalar colorchecker_srgb[MACBETH_HEIGHT][MACBETH_WIDTH] =
 
 // ColorChecker XYZ vendor information from 2005,
 // taken from http://www.babelcolor.com/main_level/ColorChecker.htm
-float colorchecker_xyz[MACBETH_SQUARES][3] = {
+double colorchecker_xyz[MACBETH_SQUARES][3] = {
     {10.7846492458451,9.81077849310112,7.70815627733434},
     {36.6852533323943,34.0026228274656,28.7808430583573},
     {15.8548147702032,17.6262277403054,35.6451162787379},
