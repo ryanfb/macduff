@@ -147,17 +147,31 @@ int main( int argc, char *argv[] )
     imat VTV = VT*V;
     VTV.print("VTV =");
     
-    mat VTP = VT*P;
-    VTP.print("VTP =");
+    mat VTVinv = pinv(conv_to<mat>::from(VTV));
+    VTVinv.print("VTVinv =");
     
-    mat A = solve(conv_to<mat>::from(VTV), VT*P);
+    mat VTVinvVT = zeros<mat>(n,MACBETH_SQUARES);
+    for(int i = 0; i < n; i++) {
+        for(int j = 0; j < MACBETH_SQUARES; j++) {
+            // combine row i of VTVinv with col j of VT
+            for(int k = 0; k < n; k++) {
+                VTVinvVT(i,j) += VTVinv(i,k)*VT(k,j);
+            }
+        }
+    }
+    VTVinvVT.print("VTVinvVT =");
+    
+    mat A = zeros<mat>(n,3);
+    for(int i = 0; i < n; i++) {
+        for(int j = 0; j < 3; j++) {
+            // combine row i of VTVinvVT with col j of P
+            for(int k = 0; k < MACBETH_SQUARES; k++) {
+                A(i,j) += VTVinvVT(i,k)*P(k,j);
+            }
+        }
+    }
+
     A.print("A =");
-    
-    // mat VTVinv = inv(conv_to<mat>::from(VTV));
-    // VTVinv.print("VTVinv =");
-    // 
-    // mat A = VTVinv * conv_to<mat>::from(VT) * P;
-    // 
     
     return 0;
 }

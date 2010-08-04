@@ -4,3 +4,4 @@ xyzfit
 *.tif
 *.jpg
 *.csv
+*.dSYM/**
