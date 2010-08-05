@@ -70,7 +70,7 @@ ColorChecker read_colorchecker_csv(char * filename)
                 }
             }
             
-            printf("Got patch %d at %d,%d\n",line_number,x,y);
+            fprintf(stderr,"Got patch %d at %d,%d\n",line_number,x,y);
         
             cvSet1D(input_colorchecker.points, line_number, cvScalar(x,y));
         }
@@ -78,7 +78,7 @@ ColorChecker read_colorchecker_csv(char * filename)
             std::getline(lineStream,cell);
             
             input_colorchecker.size = atoi(cell.c_str());
-            printf("Got size %0.f\n", input_colorchecker.size);
+            fprintf(stderr,"Got size %0.f\n", input_colorchecker.size);
         }
         else {
             break;
@@ -103,15 +103,15 @@ bool is_colorchecker_point(ColorChecker input_colorchecker, int x, int y)
 
 int main( int argc, char *argv[] )
 {
-    if( argc < 2 )
+    if( argc < 4 )
     {
-        fprintf( stderr, "Usage: %s patch_locations.csv [input_image_1 input_image_2 input_image_3 ...]\n", argv[0] );
+        fprintf( stderr, "Usage: %s patch_locations.csv [input_image_1 input_image_2 input_image_3 ...] output_image\n", argv[0] );
         return 1;
     }
     
     ColorChecker input_colorchecker = read_colorchecker_csv(argv[1]);
 
-    int n = argc - 2;
+    int n = argc - 3;
     
     // colorchecker_channels[n][MACBETH_SQUARES]
     double ** colorchecker_channels = (double **)malloc(sizeof(double*)*n);
@@ -137,9 +137,9 @@ int main( int argc, char *argv[] )
                        input_colorchecker.size),
                 input_channel).val[0];
             colorchecker_channels[i][j] = average;
-            printf("%0.f,",average);
+            fprintf(stderr,"%0.f,",average);
         }
-        printf("\n");
+        fprintf(stderr,"\n");
         
         cvReleaseImage( &input_channel );
     }
@@ -158,17 +158,17 @@ int main( int argc, char *argv[] )
         }
     }
     
-    P.print("P =");
-    V.print("V =");
+    // P.print("P =");
+    // V.print("V =");
     
     imat VT = trans(V);
-    VT.print("VT =");
+    // VT.print("VT =");
     
     imat VTV = VT*V;
-    VTV.print("VTV =");
+    // VTV.print("VTV =");
     
     mat VTVinv = pinv(conv_to<mat>::from(VTV));
-    VTVinv.print("VTVinv =");
+    // VTVinv.print("VTVinv =");
     
     mat VTVinvVT = zeros<mat>(n,MACBETH_SQUARES);
     for(int i = 0; i < n; i++) {
@@ -179,7 +179,7 @@ int main( int argc, char *argv[] )
             }
         }
     }
-    VTVinvVT.print("VTVinvVT =");
+    // VTVinvVT.print("VTVinvVT =");
     
     mat A = zeros<mat>(n,3);
     for(int i = 0; i < n; i++) {
@@ -191,16 +191,18 @@ int main( int argc, char *argv[] )
         }
     }
 
-    A.print("A =");
+    // A.print("A =");
     
     IplImage * xyz_recon = cvCreateImage(input_size, IPL_DEPTH_32F, 3);
     cvSet(xyz_recon, cvScalarAll(0));
 
-    printf("Depth: %d\n",input_depth);
+    fprintf(stderr,"Depth: %d\n",input_depth);
     for(int i = 0; i < n; i++) {
         fprintf(stderr, "Loading channel %d (%s)\n", i, argv[i+2]);
         IplImage * input_channel = cvLoadImage( argv[i+2],
             CV_LOAD_IMAGE_GRAYSCALE|CV_LOAD_IMAGE_ANYDEPTH );
+        
+        printf("%f,%f,%f,%s\n", A(i,0), A(i,1), A(i,2), argv[i+2]);
         
         for(int y = 0; y < input_size.height; y++) {
             for(int x = 0; x < input_size.width; x++) {
@@ -212,11 +214,11 @@ int main( int argc, char *argv[] )
                     double scaled = A(i,j)*channel_value.val[0];
                     xyz_value.val[j] += scaled;
                     if(interested) {
-                        printf("%f: %f\t",scaled,xyz_value.val[j]);
+                        fprintf(stderr,"%f: %f\t",scaled,xyz_value.val[j]);
                     }
                 }
                 if(interested) {
-                    printf("\n");
+                    fprintf(stderr,"\n");
                 }
                 
                 cvSet2D(xyz_recon,y,x,xyz_value);
@@ -234,12 +236,12 @@ int main( int argc, char *argv[] )
                    input_colorchecker.size,
                    input_colorchecker.size),
             xyz_recon);
-        printf("%f,%f,%f\n",average.val[0],average.val[1],average.val[2]);
+        fprintf(stderr,"%f,%f,%f\n",average.val[0],average.val[1],average.val[2]);
     }
     
     cvCvtColor(xyz_recon, xyz_recon, CV_XYZ2BGR);
     
-    cvSaveImage( "xyzrgb.png", xyz_recon );
+    cvSaveImage( argv[argc-1], xyz_recon );
     cvReleaseImage( &xyz_recon );
     
     return 0;
