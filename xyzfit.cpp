@@ -13,22 +13,26 @@
 
 using namespace arma;
 
-double rect_average(CvRect rect, IplImage* image)
+CvScalar rect_average(CvRect rect, IplImage* image)
 {       
-    double average = 0;
+    CvScalar average = cvScalarAll(0);
     int count = 0;
     for(int x = rect.x; x < (rect.x+rect.width); x++) {
         for(int y = rect.y; y < (rect.y+rect.height); y++) {
             if((x >= 0) && (y >= 0) && (x < image->width) && (y < image->height)) {
                 CvScalar s = cvGet2D(image,y,x);
-                average += s.val[0];
-                
+                average.val[0] += s.val[0];
+                average.val[1] += s.val[1];
+                average.val[2] += s.val[2];
+            
                 count++;
             }
         }
     }
     
-    average /= count;
+    for(int i = 0; i < 3; i++){
+        average.val[i] /= count;
+    }
     
     return average;
 }
@@ -86,6 +90,17 @@ ColorChecker read_colorchecker_csv(char * filename)
     return input_colorchecker;
 }
 
+bool is_colorchecker_point(ColorChecker input_colorchecker, int x, int y)
+{
+    for(int j = 0; j < MACBETH_SQUARES; j++) {
+        CvScalar point = cvGet1D(input_colorchecker.points, j);
+        if((point.val[0] == x) && (point.val[1] == y)) {
+            return true;
+        }
+    }
+    return false;
+}
+
 int main( int argc, char *argv[] )
 {
     if( argc < 2 )
@@ -101,10 +116,15 @@ int main( int argc, char *argv[] )
     // colorchecker_channels[n][MACBETH_SQUARES]
     double ** colorchecker_channels = (double **)malloc(sizeof(double*)*n);
     
+    CvSize input_size;
+    int input_depth;
     for(int i = 0; i < n; i++) {
         fprintf(stderr, "Loading channel %d (%s)\n", i, argv[i+2]);
         IplImage * input_channel = cvLoadImage( argv[i+2],
             CV_LOAD_IMAGE_GRAYSCALE|CV_LOAD_IMAGE_ANYDEPTH );
+        input_size.width = input_channel->width;
+        input_size.height = input_channel->height;
+        input_depth = input_channel->depth;
         
         colorchecker_channels[i] = (double *)malloc(sizeof(double)*MACBETH_SQUARES);
         
@@ -115,7 +135,7 @@ int main( int argc, char *argv[] )
                        point.val[1]-input_colorchecker.size/2,
                        input_colorchecker.size,
                        input_colorchecker.size),
-                input_channel);
+                input_channel).val[0];
             colorchecker_channels[i][j] = average;
             printf("%0.f,",average);
         }
@@ -172,6 +192,55 @@ int main( int argc, char *argv[] )
     }
 
     A.print("A =");
+    
+    IplImage * xyz_recon = cvCreateImage(input_size, IPL_DEPTH_32F, 3);
+    cvSet(xyz_recon, cvScalarAll(0));
+
+    printf("Depth: %d\n",input_depth);
+    for(int i = 0; i < n; i++) {
+        fprintf(stderr, "Loading channel %d (%s)\n", i, argv[i+2]);
+        IplImage * input_channel = cvLoadImage( argv[i+2],
+            CV_LOAD_IMAGE_GRAYSCALE|CV_LOAD_IMAGE_ANYDEPTH );
+        
+        for(int y = 0; y < input_size.height; y++) {
+            for(int x = 0; x < input_size.width; x++) {
+                bool interested = false; // is_colorchecker_point(input_colorchecker,x,y);
+                CvScalar xyz_value = cvGet2D(xyz_recon,y,x);
+                CvScalar channel_value = cvGet2D(input_channel,y,x);
+                
+                for(int j = 0; j < 3; j++) {
+                    double scaled = A(i,j)*channel_value.val[0];
+                    xyz_value.val[j] += scaled;
+                    if(interested) {
+                        printf("%f: %f\t",scaled,xyz_value.val[j]);
+                    }
+                }
+                if(interested) {
+                    printf("\n");
+                }
+                
+                cvSet2D(xyz_recon,y,x,xyz_value);
+            }
+        }
+        
+        cvReleaseImage( &input_channel );
+    }
+    
+    for(int j = 0; j < MACBETH_SQUARES; j++) {
+        CvScalar point = cvGet1D(input_colorchecker.points, j);
+        CvScalar average = rect_average(
+            cvRect(point.val[0]-input_colorchecker.size/2,
+                   point.val[1]-input_colorchecker.size/2,
+                   input_colorchecker.size,
+                   input_colorchecker.size),
+            xyz_recon);
+        printf("%f,%f,%f\n",average.val[0],average.val[1],average.val[2]);
+    }
+    
+    cvCvtColor(xyz_recon, xyz_recon, CV_XYZ2BGR);
+    
+    cvSaveImage( "xyzrgb.png", xyz_recon );
+    cvReleaseImage( &xyz_recon );
     
     return 0;
 }
