@@ -168,22 +168,12 @@ int main( int argc, char *argv[] )
     gsl_blas_dgemm(CblasNoTrans, CblasNoTrans,
                    1.0, VT, V,
                    0.0, VTV);
-                   
-   for (int i = 0; i < n; i++)
-     for (int j = 0; j < n; j++)
-       printf ("VTV(%d,%d) = %g\n", i, j, 
-               gsl_matrix_get (VTV, i, j));
     
     gsl_matrix * VTP = gsl_matrix_calloc(n,3);
     
     gsl_blas_dgemm(CblasNoTrans, CblasNoTrans,
                    1.0, VT, P,
                    0.0, VTP);
-    
-    for (int i = 0; i < n; i++)
-      for (int j = 0; j < 3; j++)
-        printf ("VTP(%d,%d) = %g\n", i, j, 
-                gsl_matrix_get (VTP, i, j));
     
     gsl_matrix * A = gsl_matrix_calloc(n,3);
     
@@ -203,96 +193,61 @@ int main( int argc, char *argv[] )
     }
     gsl_permutation_free(p);
     
-    for (int i = 0; i < n; i++)
-      for (int j = 0; j < 3; j++)
-        printf ("A(%d,%d) = %g\n", i, j, 
-                gsl_matrix_get (A, i, j));
+    // for (int i = 0; i < n; i++)
+    //   for (int j = 0; j < 3; j++)
+    //     fprintf(stderr,"A(%d,%d) = %g\n", i, j, 
+    //             gsl_matrix_get (A, i, j));
     
-    // P.print("P =");
-    // V.print("V =");
+    IplImage * xyz_recon = cvCreateImage(input_size, IPL_DEPTH_32F, 3);
+    cvSet(xyz_recon, cvScalarAll(0));
     
-    // imat VT = trans(V);
-    // VT.print("VT =");
+    fprintf(stderr,"Depth: %d\n",input_depth);
+    for(int i = 0; i < n; i++) {
+        fprintf(stderr, "Loading channel %d (%s)\n", i, argv[i+2]);
+        IplImage * input_channel = cvLoadImage( argv[i+2],
+            CV_LOAD_IMAGE_GRAYSCALE|CV_LOAD_IMAGE_ANYDEPTH );
+        
+        printf("%f,%f,%f,%s\n", gsl_matrix_get(A,i,0), gsl_matrix_get(A,i,1), gsl_matrix_get(A,i,2), argv[i+2]);
+        
+        for(int y = 0; y < input_size.height; y++) {
+            for(int x = 0; x < input_size.width; x++) {
+                bool interested = false; // is_colorchecker_point(input_colorchecker,x,y);
+                CvScalar xyz_value = cvGet2D(xyz_recon,y,x);
+                CvScalar channel_value = cvGet2D(input_channel,y,x);
+                
+                for(int j = 0; j < 3; j++) {
+                    double scaled = gsl_matrix_get(A,i,j)*channel_value.val[0];
+                    xyz_value.val[j] += scaled;
+                    if(interested) {
+                        fprintf(stderr,"%f: %f\t",scaled,xyz_value.val[j]);
+                    }
+                }
+                if(interested) {
+                    fprintf(stderr,"\n");
+                }
+                
+                cvSet2D(xyz_recon,y,x,xyz_value);
+            }
+        }
+        
+        cvReleaseImage( &input_channel );
+    }
     
-    // imat VTV = VT*V;
-    // VTV.print("VTV =");
+    for(int j = 0; j < MACBETH_SQUARES; j++) {
+        CvScalar point = cvGet1D(input_colorchecker.points, j);
+        CvScalar average = rect_average(
+            cvRect(point.val[0]-input_colorchecker.size/2,
+                   point.val[1]-input_colorchecker.size/2,
+                   input_colorchecker.size,
+                   input_colorchecker.size),
+            xyz_recon);
+        fprintf(stderr,"%f,%f,%f\n",average.val[0],average.val[1],average.val[2]);
+    }
     
-    // mat VTVinv = pinv(conv_to<mat>::from(VTV));
-    // VTVinv.print("VTVinv =");
+    cvCvtColor(xyz_recon, xyz_recon, CV_XYZ2BGR);
     
-    // mat VTVinvVT = zeros<mat>(n,MACBETH_SQUARES);
-    // for(int i = 0; i < n; i++) {
-    //     for(int j = 0; j < MACBETH_SQUARES; j++) {
-    //         // combine row i of VTVinv with col j of VT
-    //         for(int k = 0; k < n; k++) {
-    //             VTVinvVT(i,j) += VTVinv(i,k)*VT(k,j);
-    //         }
-    //     }
-    // }
-    // VTVinvVT.print("VTVinvVT =");
-    
-    // mat A = zeros<mat>(n,3);
-    // for(int i = 0; i < n; i++) {
-    //     for(int j = 0; j < 3; j++) {
-    //         // combine row i of VTVinvVT with col j of P
-    //         for(int k = 0; k < MACBETH_SQUARES; k++) {
-    //             A(i,j) += VTVinvVT(i,k)*P(k,j);
-    //         }
-    //     }
-    // }
-
-    // A.print("A =");
-    
-    // IplImage * xyz_recon = cvCreateImage(input_size, IPL_DEPTH_32F, 3);
-    // cvSet(xyz_recon, cvScalarAll(0));
-    // 
-    // fprintf(stderr,"Depth: %d\n",input_depth);
-    // for(int i = 0; i < n; i++) {
-    //     fprintf(stderr, "Loading channel %d (%s)\n", i, argv[i+2]);
-    //     IplImage * input_channel = cvLoadImage( argv[i+2],
-    //         CV_LOAD_IMAGE_GRAYSCALE|CV_LOAD_IMAGE_ANYDEPTH );
-    //     
-    //     printf("%f,%f,%f,%s\n", A(i,0), A(i,1), A(i,2), argv[i+2]);
-    //     
-    //     for(int y = 0; y < input_size.height; y++) {
-    //         for(int x = 0; x < input_size.width; x++) {
-    //             bool interested = false; // is_colorchecker_point(input_colorchecker,x,y);
-    //             CvScalar xyz_value = cvGet2D(xyz_recon,y,x);
-    //             CvScalar channel_value = cvGet2D(input_channel,y,x);
-    //             
-    //             for(int j = 0; j < 3; j++) {
-    //                 double scaled = A(i,j)*channel_value.val[0];
-    //                 xyz_value.val[j] += scaled;
-    //                 if(interested) {
-    //                     fprintf(stderr,"%f: %f\t",scaled,xyz_value.val[j]);
-    //                 }
-    //             }
-    //             if(interested) {
-    //                 fprintf(stderr,"\n");
-    //             }
-    //             
-    //             cvSet2D(xyz_recon,y,x,xyz_value);
-    //         }
-    //     }
-    //     
-    //     cvReleaseImage( &input_channel );
-    // }
-    // 
-    // for(int j = 0; j < MACBETH_SQUARES; j++) {
-    //     CvScalar point = cvGet1D(input_colorchecker.points, j);
-    //     CvScalar average = rect_average(
-    //         cvRect(point.val[0]-input_colorchecker.size/2,
-    //                point.val[1]-input_colorchecker.size/2,
-    //                input_colorchecker.size,
-    //                input_colorchecker.size),
-    //         xyz_recon);
-    //     fprintf(stderr,"%f,%f,%f\n",average.val[0],average.val[1],average.val[2]);
-    // }
-    // 
-    // cvCvtColor(xyz_recon, xyz_recon, CV_XYZ2BGR);
-    // 
-    // cvSaveImage( argv[argc-1], xyz_recon );
-    // cvReleaseImage( &xyz_recon );
+    cvSaveImage( argv[argc-1], xyz_recon );
+    cvReleaseImage( &xyz_recon );
     
     return 0;
 }
