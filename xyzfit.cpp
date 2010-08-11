@@ -13,6 +13,36 @@
 
 #include "colorchecker.h"
 
+// http://www.brucelindbloom.com/Eqn_XYZ_to_Lab.html
+CvScalar xyz_to_lab(CvScalar xyz, CvScalar reference_white)
+{
+    double epsilon = 216./24389.;
+    double kappa = 24389./27.;
+    
+    CvScalar scaled;
+    for(int i = 0; i < 3; i++) {
+        scaled.val[i] = xyz.val[i] / reference_white.val[i];
+    }
+    
+    CvScalar f;
+    for(int i = 0; i < 3; i++) {
+        if(scaled.val[i] > epsilon) {
+            f.val[i] = pow(scaled.val[i],1./3.);
+        }
+        else {
+            f.val[i] = (kappa * scaled.val[i] + 16.)/116.;
+        }
+    }
+    
+    CvScalar Lab = cvScalar(
+        116. * f.val[1] - 16.,        // L
+        500. * (f.val[0] - f.val[1]), // a
+        200. * (f.val[1] - f.val[2])  // b
+    );
+    
+    return Lab;
+}
+
 CvScalar rect_average(CvRect rect, IplImage* image)
 {       
     CvScalar average = cvScalarAll(0);
