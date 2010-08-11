@@ -8,34 +8,6 @@
 
 #define MAX_RGB_DISTANCE 444
 
-double euclidean_distance(CvScalar p_1, CvScalar p_2)
-{   
-    double sum = 0;
-    for(int i = 0; i < 3; i++) {
-        sum += pow(p_1.val[i]-p_2.val[i],2.);
-    }
-    return sqrt(sum);
-}
-
-double euclidean_distance(CvPoint p_1, CvPoint p_2)
-{
-    return euclidean_distance(cvScalar(p_1.x,p_1.y,0),cvScalar(p_2.x,p_2.y,0));
-}
-
-double euclidean_distance_lab(CvScalar p_1, CvScalar p_2)
-{
-    // convert to Lab for better perceptual distance
-    IplImage * convert = cvCreateImage( cvSize(2,1), 8, 3);
-    cvSet2D(convert,0,0,p_1);
-    cvSet2D(convert,0,1,p_2);
-    cvCvtColor(convert,convert,CV_BGR2Lab);
-    p_1 = cvGet2D(convert,0,0);
-    p_2 = cvGet2D(convert,0,1);
-    cvReleaseImage(&convert);
-    
-    return euclidean_distance(p_1, p_2);
-}
-
 CvRect contained_rectangle(CvBox2D box)
 {
     return cvRect(box.center.x - box.size.width/4,

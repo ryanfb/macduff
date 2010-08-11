@@ -131,6 +131,19 @@ bool is_colorchecker_point(ColorChecker input_colorchecker, int x, int y)
     return false;
 }
 
+CvScalar patch_average(ColorChecker input_colorchecker, int j, IplImage * xyz_recon)
+{
+    CvScalar point = cvGet1D(input_colorchecker.points, j);
+    CvScalar average = rect_average(
+        cvRect(point.val[0]-input_colorchecker.size/2,
+               point.val[1]-input_colorchecker.size/2,
+               input_colorchecker.size,
+               input_colorchecker.size),
+        xyz_recon);
+    
+    return average;
+}
+
 int main( int argc, char *argv[] )
 {
     if( argc < 4 )
@@ -263,15 +276,23 @@ int main( int argc, char *argv[] )
         cvReleaseImage( &input_channel );
     }
     
+    fprintf(stderr,"ΔEab:\n");
+    CvScalar average_white = patch_average(input_colorchecker, WHITE_PATCH, xyz_recon);
+        
     for(int j = 0; j < MACBETH_SQUARES; j++) {
-        CvScalar point = cvGet1D(input_colorchecker.points, j);
-        CvScalar average = rect_average(
-            cvRect(point.val[0]-input_colorchecker.size/2,
-                   point.val[1]-input_colorchecker.size/2,
-                   input_colorchecker.size,
-                   input_colorchecker.size),
-            xyz_recon);
-        fprintf(stderr,"%f,%f,%f\n",average.val[0],average.val[1],average.val[2]);
+        CvScalar average = patch_average(input_colorchecker, j, xyz_recon);
+        // fprintf(stderr,"%f,%f,%f\n",average.val[0],average.val[1],average.val[2]);
+        
+        fprintf(stderr,"%d\t%f\n",j+1,
+            euclidean_distance(xyz_to_lab(average, average_white),
+                               xyz_to_lab(
+                                   cvScalar(colorchecker_xyz[j][0],
+                                            colorchecker_xyz[j][1],
+                                            colorchecker_xyz[j][2]),
+                                   cvScalar(colorchecker_xyz[WHITE_PATCH][0],
+                                            colorchecker_xyz[WHITE_PATCH][1],
+                                            colorchecker_xyz[WHITE_PATCH][2])
+                               )));
     }
     
     cvCvtColor(xyz_recon, xyz_recon, CV_XYZ2BGR);
