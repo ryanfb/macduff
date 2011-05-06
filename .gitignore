@@ -1,6 +1,9 @@
 macduff
 xyzfit
+applyfit
+metacow
 *.png
 *.tif
 *.jpg
 *.csv
+*.dSYM/**
