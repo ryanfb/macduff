@@ -5,6 +5,7 @@ Macduff is a tool for finding the Macbeth ColorChecker chart in an image.
 
   Macduff depends on OpenCV, and the default Makefile uses pkg-config to set
   the correct compilation flags. Tweak as needed.
+  
     $ make
     $ ./macduff input.tif result.png > result.csv
 
