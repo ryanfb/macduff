@@ -209,6 +209,8 @@ struct ColorChecker {
 ColorChecker find_colorchecker(CvSeq * quads, CvSeq * boxes, CvMemStorage *storage, IplImage *image, IplImage *original_image)
 {
     CvPoint2D32f box_corners[4];
+    bool passport_box_flipped = false;
+    bool rotated_box = false;
     
     CvMat* points = cvCreateMat( boxes->total , 1, CV_32FC2 );
     for(int i = 0; i < boxes->total; i++)
@@ -217,7 +219,16 @@ ColorChecker find_colorchecker(CvSeq * quads, CvSeq * boxes, CvMemStorage *stora
         cvSet1D(points, i, cvScalar(box.center.x,box.center.y));
     }
     CvBox2D passport_box = cvMinAreaRect2(points,storage);
+    fprintf(stderr,"Box:\n\tCenter: %f,%f\n\tSize: %f,%f\n\tAngle: %f\n",passport_box.center.x,passport_box.center.y,passport_box.size.width,passport_box.size.height,passport_box.angle);
+    if(passport_box.angle < 0.0) {
+      passport_box_flipped = true;
+    }
+    
     cvBoxPoints(passport_box, box_corners);
+    // for(int i = 0; i < 4; i++)
+    // {
+    //   fprintf(stderr,"Box corner %d: %d,%d\n",i,cvPointFrom32f(box_corners[i]).x,cvPointFrom32f(box_corners[i]).y);
+    // }
     
     // cvBox(passport_box, image, cvScalarAll(128), 10);
     
@@ -225,6 +236,7 @@ ColorChecker find_colorchecker(CvSeq * quads, CvSeq * boxes, CvMemStorage *stora
        euclidean_distance(cvPointFrom32f(box_corners[1]),cvPointFrom32f(box_corners[2]))) {
         fprintf(stderr,"Box is upright, rotating\n");
         rotate_box(box_corners);
+        rotated_box = true && passport_box_flipped;
     }
 
     double horizontal_spacing = euclidean_distance(
@@ -260,15 +272,16 @@ ColorChecker find_colorchecker(CvSeq * quads, CvSeq * boxes, CvMemStorage *stora
     for(int x = 0; x < MACBETH_WIDTH; x++) {
         for(int y = 0; y < MACBETH_HEIGHT; y++) {
             CvPoint2D32f row_start;
-            if ( image->origin == IPL_ORIGIN_BL ) 
-            { 
-              row_start.x = box_corners[0].x + vertical_spacing * y * (1 / vertical_mag); 
-              row_start.y = box_corners[0].y + vertical_spacing * y * (vertical_slope / vertical_mag); 
-            } 
-            else 
-            { 
-              row_start.x = box_corners[0].x - vertical_spacing * y * (1 / vertical_mag); 
-              row_start.y = box_corners[0].y - vertical_spacing * y * (vertical_slope / vertical_mag); 
+            
+            if ( ((image->origin == IPL_ORIGIN_BL) || !rotated_box) && !((image->origin == IPL_ORIGIN_BL) && rotated_box) )
+            {
+                row_start.x = box_corners[0].x + vertical_spacing * y * (1 / vertical_mag);
+                row_start.y = box_corners[0].y + vertical_spacing * y * (vertical_slope / vertical_mag);
+            }
+            else
+            {
+                row_start.x = box_corners[0].x - vertical_spacing * y * (1 / vertical_mag);
+                row_start.y = box_corners[0].y - vertical_spacing * y * (vertical_slope / vertical_mag);
             }
             
             CvRect rect = cvRect(0,0,average_size,average_size);
