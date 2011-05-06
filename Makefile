@@ -1,2 +1,8 @@
+CXXFLAGS += $(shell pkg-config --cflags opencv) -I. -g
+LDFLAGS += $(shell pkg-config --libs opencv)
+
 macduff: macduff.cpp
-	g++ -I/opt/local/include -L/opt/local/lib macduff.cpp -lcvaux -lcv -lhighgui -lcxcore -o macduff
+	g++ $(CXXFLAGS) macduff.cpp $(LDFLAGS) -o macduff
+
+clean:
+		rm -f macduff
