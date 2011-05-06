@@ -260,8 +260,16 @@ ColorChecker find_colorchecker(CvSeq * quads, CvSeq * boxes, CvMemStorage *stora
     for(int x = 0; x < MACBETH_WIDTH; x++) {
         for(int y = 0; y < MACBETH_HEIGHT; y++) {
             CvPoint2D32f row_start;
-            row_start.x = box_corners[0].x + vertical_spacing * y * (1 / vertical_mag);
-            row_start.y = box_corners[0].y + vertical_spacing * y * (vertical_slope / vertical_mag);
+            if ( image->origin == IPL_ORIGIN_BL ) 
+            { 
+              row_start.x = box_corners[0].x + vertical_spacing * y * (1 / vertical_mag); 
+              row_start.y = box_corners[0].y + vertical_spacing * y * (vertical_slope / vertical_mag); 
+            } 
+            else 
+            { 
+              row_start.x = box_corners[0].x - vertical_spacing * y * (1 / vertical_mag); 
+              row_start.y = box_corners[0].y - vertical_spacing * y * (vertical_slope / vertical_mag); 
+            }
             
             CvRect rect = cvRect(0,0,average_size,average_size);
             
