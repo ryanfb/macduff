@@ -31,6 +31,8 @@ ColorChecker orientation ("dark skin" top left, "black" bottom right):
 
 ![ColorChecker layout](https://ryanfb.s3.amazonaws.com/images/CC_Avg20_orig_layout.png)
 
+See also: [Automatic ColorChecker Detection, a Survey](http://ryanfb.github.io/etc/2015/07/08/automatic_colorchecker_detection.html)
+
 ##LICENSE
 
 Macduff is 3-clause BSD and includes some code taken from OpenCV. See LICENSE.TXT.
