@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <opencv/cv.h>
 #include <opencv/highgui.h>
+#include <opencv2/calib3d.hpp>
 
 #define MACBETH_WIDTH   6
 #define MACBETH_HEIGHT  4
@@ -135,18 +136,6 @@ CvScalar contour_average(CvContour* contour, IplImage* image)
     return average;
 }
 
-void * cvBox(CvBox2D box, IplImage *image, CvScalar color, int thickness)
-{
-    CvPoint2D32f pt[4];
-    
-    cvBoxPoints(box, pt);
-    
-    for(int i = 0; i < 4; i++) {
-        cvLine(image, cvPointFrom32f(pt[i]), cvPointFrom32f(pt[(i+1)%4]), color, thickness);
-        cvCircle(image, cvPointFrom32f(pt[i]), thickness, cvScalarAll((255/4)*i), -1);
-    }
-}
-
 void rotate_box(CvPoint2D32f * box_corners)
 {
     CvPoint2D32f last = box_corners[3];
@@ -173,7 +162,7 @@ double check_colorchecker(CvMat * colorchecker)
     return difference;
 }
 
-void * draw_colorchecker(CvMat * colorchecker_values, CvMat * colorchecker_points, IplImage * image, int size)
+void draw_colorchecker(CvMat * colorchecker_values, CvMat * colorchecker_points, IplImage * image, int size)
 {
     for(int x = 0; x < MACBETH_WIDTH; x++) {
         for(int y = 0; y < MACBETH_HEIGHT; y++) {
