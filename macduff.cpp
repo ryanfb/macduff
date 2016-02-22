@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include <opencv/cv.h>
 #include <opencv/highgui.h>
-#include <opencv2/calib3d.hpp>
+#include <opencv2/calib3d/calib3d.hpp>
 
 #define MACBETH_WIDTH   6
 #define MACBETH_HEIGHT  4
